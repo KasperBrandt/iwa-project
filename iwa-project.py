@@ -1,4 +1,4 @@
-import cgi, datetime, wsgiref.handlers, os, pylast
+import cgi, datetime, wsgiref.handlers, os
 from datetime import date
 
 from google.appengine.ext.webapp import template
