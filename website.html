@@ -1,0 +1,40 @@
+<html>
+  <head>
+    <link type="text/css" rel="stylesheet" href="/stylesheets/main.css" />  
+    <script src="/js/jquery-1.7.1.min.js" type="text/javascript"></script>
+    <script src="/js/date.js" type="text/javascript"></script>
+    <script src="/js/jquery.ui.datePicker.js" type="text/javascript"></script>
+    <script src="/js/jquery.ui.core.js" type="text/javascript"></script>
+  </head>
+  <body>
+		<div id="box-website">
+			<h2>Intelligent web applications project</h2>
+			<h3>By Group 18 (<a href='mailto:kasperbrandt87@gmail.com'>Kasper Brandt</a> and <a href='mailto:guillelmo@gmail.com'>Guillermo Soberon</a>)</h3>
+			<h4>Showing results for {{ username }}:</h4>
+			<div id="artists">
+			<h5>Artists:</h5>
+			<table>
+				{% for artist in artists %}
+					<tr><td>{{ artist }}</td></tr>
+				{% endfor %}
+			</table>
+			<div id="events">
+			<h5>All events:</h5>
+			<table>
+				{% for event in eventNames %}
+					<tr><td>{{ event }}</td></tr>
+				{% endfor %}
+			</table>
+			</div>
+			<div id="matches">
+			<h5>Matches:</h5>
+			<table>
+				{% for match in matches %}
+					<tr><td>{{ match }}</td></tr>
+				{% endfor %}
+			</table>
+			</div>
+			</div>
+		</div>
+  </body>
+</html>
