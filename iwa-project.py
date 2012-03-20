@@ -1,4 +1,4 @@
-import cgi, datetime, wsgiref.handlers, os
+import cgi, datetime, wsgiref.handlers, os, random
 from datetime import date
 
 from google.appengine.ext.webapp import template
@@ -31,9 +31,11 @@ class MainPage(webapp.RequestHandler):
         nrOfArtists = 500
         artists = getLastfmArtists(username, nrOfArtists)
 
-        locationId = getLocationId(city)
+        location = getLocation(city)
 
-        events = getEvents(date1, date2, locationId)
+        locationInformation = getLocInfo(location[1],location[2])
+
+        events = getEvents(date1, date2, location[0])
 
         matchingEvents = matchEvents(artists, events)
 
@@ -43,17 +45,17 @@ class MainPage(webapp.RequestHandler):
             eventNames.insert(index, concert[2])
             index += 1
 
-        matchingEventNames = []
+        locationNames = []
         index2 = 0
-        for match in matchingEvents:
-            matchingEventNames.insert(index2, match[2])
+        for location in locationInformation:
+            locationNames.insert(index2, location[0])
             index2 += 1
 
         template_values = {
             'username': username,
             'artists': artists,
             'eventNames': eventNames,
-            'matches': matchingEventNames,
+            'locations': locationNames,
         }
 
         path = os.path.join(os.path.dirname(__file__), "website.html")
@@ -97,7 +99,7 @@ def getLastfmArtists(username, nrOfArtists):
 
     return artists
 
-def getLocationId(city):
+def getLocation(city):
 
     api_key = "wV3l1uxVevrxnA6e"
 
@@ -108,14 +110,58 @@ def getLocationId(city):
     locationXML = urlfetch.fetch(url,deadline=60,method=urlfetch.GET)
 
     if locationXML.status_code == 200:
+        location = []
 
         tree = etree.fromstring(locationXML.content)
         locationId = tree.find('results/location/metroArea').attrib['id']
-        return locationId
+        locationLat = tree.find('results/location/metroArea').attrib['lat']
+        locationLong = tree.find('results/location/metroArea').attrib['lng']
+
+        location.insert(0, locationId)
+        location.insert(1, locationLat)
+        location.insert(2, locationLong)
+
+        return location
 
     else:
         # Need better error handling
         print "Location does not exist or something else went wrong with the connection to the Songkick server."
+
+def getLocInfo(lat,long):
+
+    results = []
+    index = 0
+
+    api_key = "AIzaSyDva2nYRJnjiQ-BW-I67_5m7GxA_19gA7Y"
+
+    url = "https://maps.googleapis.com/maps/api/place/search/xml?location="+lat+","+long+"&radius=10000&types=amusement_park|museum|shopping_mall|zoo|point_of_interest&sensor=false&key=" + api_key
+
+    poiXML = urlfetch.fetch(url,deadline=60,method=urlfetch.GET)
+
+    if poiXML.status_code == 200:
+
+        tree = etree.fromstring(poiXML.content)
+
+        for poi in tree.findall('result'):
+            place = []
+
+            try:
+                poiName = poi.find('name').text
+                poiIcon = poi.find('icon').text
+
+                place.insert(0, poiName)
+                place.insert(1, poiIcon)
+
+                results.insert(index,place)
+                index += 1
+
+            except AttributeError:
+                print ""
+
+        return results
+
+    else:
+        print "Something went wrong with the connection to the Google Places server"
 
 def getEvents(startDate, endDate, locId):
 

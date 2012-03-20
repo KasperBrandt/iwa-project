@@ -11,30 +11,26 @@
 			<h2>Intelligent web applications project</h2>
 			<h3>By Group 18 (<a href='mailto:kasperbrandt87@gmail.com'>Kasper Brandt</a> and <a href='mailto:guillelmo@gmail.com'>Guillermo Soberon</a>)</h3>
 			<h4>Showing results for {{ username }}:</h4>
-			<div id="artists">
-			<h5>Artists:</h5>
-			<table>
-				{% for artist in artists %}
-					<tr><td>{{ artist }}</td></tr>
-				{% endfor %}
+			<table class="results">
+				<tr><td><h5>Artists:</h5></td>
+				<td><h5>All events:</h5></td>
+				<td><h5>Matches:</h5></td></tr>
+				<tr><td><table class="column">
+					{% for artist in artists %}
+						<tr><td>{{ artist }}</td></tr>
+					{% endfor %}
+				</table></td>
+				<td><table class="column">
+					{% for event in eventNames %}
+						<tr><td>{{ event }}</td></tr>
+					{% endfor %}
+				</table></td>
+				<td><table class="column">
+					{% for location in locations %}
+						<tr><td>{{ location }}</td></tr>
+					{% endfor %}
+				</table></td></tr>
 			</table>
-			<div id="events">
-			<h5>All events:</h5>
-			<table>
-				{% for event in eventNames %}
-					<tr><td>{{ event }}</td></tr>
-				{% endfor %}
-			</table>
-			</div>
-			<div id="matches">
-			<h5>Matches:</h5>
-			<table>
-				{% for match in matches %}
-					<tr><td>{{ match }}</td></tr>
-				{% endfor %}
-			</table>
-			</div>
-			</div>
 		</div>
   </body>
 </html>
