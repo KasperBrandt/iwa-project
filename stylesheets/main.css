@@ -35,6 +35,14 @@ table {
 	color: white;
 }
 
+.results {
+    width: 900px;
+}
+
+.column {
+	width: 250px;
+}
+
 .prefix {
 	display: inline-block;
 	line-height: 50px;
