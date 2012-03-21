@@ -1,7 +1,7 @@
 
 # Songkick methods build specially for IWA (not a generic API).
 
-from google.appengine.api import urlfetch
+import urlfetch
 from xml.etree import ElementTree as etree
 from datetime import date
 

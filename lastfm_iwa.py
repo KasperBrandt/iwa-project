@@ -1,7 +1,7 @@
 
 # Last.fm methods build specially for IWA (not a generic API).
 
-from google.appengine.api import urlfetch
+import urlfetch
 from xml.etree import ElementTree as etree
 
 def getUserArtists(username, nrOfArtists):
@@ -29,3 +29,5 @@ def getUserArtists(username, nrOfArtists):
         print "Last FM User does not exist or something else went wrong with the connection to the Last FM server."
 
     return artists
+
+

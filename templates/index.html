@@ -1,0 +1,31 @@
+<html>
+{% load static %}
+  <head>
+
+    <link type="text/css" rel="stylesheet" href="{% get_static_prefix %}stylesheets/main.css" />  
+    <script src="{% get_static_prefix %}js/jquery-1.7.1.min.js" type="text/javascript"></script>
+    <script src="{% get_static_prefix %}js/date.js" type="text/javascript"></script>
+    <script src="{% get_static_prefix %}js/jquery.ui.datepicker.js" type="text/javascript"></script>
+    <script src="{% get_static_prefix %}js/jquery.ui.core.js" type="text/javascript"></script>
+  </head>
+  <body>
+		<div id="box">
+			<h2>Intelligent web applications project</h2>
+			<h3>By Group 18 (<a href='mailto:kasperbrandt87@gmail.com'>Kasper Brandt</a> and <a href='mailto:guillelmo@gmail.com'>Guillermo Soberon</a>)</h3>
+			<h5>Select a last.fm username, a start and end date and a city. We will show you the artists that the user has listened to, and similar artists, giving a concert in the selected city during the selected timeframe.</h5>
+			<form method="post" action='.'> {% csrf_token %}
+				<script>
+					$(function() {
+						$( "#datepickerStart" ).datepicker();
+						$( "#datepickerEnd" ).datepicker();
+					});
+				</script>
+				<div><span class="prefix">Last.FM username: <input type="text" id="username" name="username" rows="1" cols="20" value="{{username}}"></textarea></span></div>
+				<div><span class="prefix">Starting Date: <input type="text" id="datepickerStart" name="datepickerStart" value="{{startDate}}"></span></div>
+				<div><span class="prefix">Ending Date: <input type="text" id="datepickerEnd" name="datepickerEnd" value="{{endDate}}"></span></div>
+				<div><span class="prefix">City: <input type="text" id="city" name="city" value="{{city}}"></span></div>
+				<div><input type="submit" value="Continue"></div>
+			</form>
+		</div>
+  </body>
+</html>
