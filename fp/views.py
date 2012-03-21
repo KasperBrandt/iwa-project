@@ -7,6 +7,7 @@ from django import forms
 
 import songkick
 import util
+import places
 import lastfm_iwa as lastfm
 
 
@@ -41,9 +42,11 @@ def main(request):
         nrOfArtists = 500
         artists = lastfm.getUserArtists(username, nrOfArtists)
 
-        locationId = songkick.getLocationId(city)
+        location = songkick.getLocation(city)
 
-        events = songkick.getEvents(date1, date2, locationId)
+        locationInformation = places.getLocInfo(location[1],location[2])
+
+        events = songkick.getEvents(date1, date2, location[0])
 
         matchingEvents = util.matchEvents(artists, events)
 
@@ -53,17 +56,17 @@ def main(request):
             eventNames.insert(index, concert[2])
             index += 1
 
-        matchingEventNames = []
+        locationNames = []
         index2 = 0
-        for match in matchingEvents:
-            matchingEventNames.insert(index2, match[2])
+        for location in locationInformation:
+            locationNames.insert(index2, location[0])
             index2 += 1
 
         template_values = {
             'username': username,
             'artists': artists,
             'eventNames': eventNames,
-            'matches': matchingEventNames,
+            'locations': locationNames,
         }
         
         #path = os.path.join(os.path.dirname(__file__), "website.html")

@@ -5,7 +5,7 @@ import urlfetch
 from xml.etree import ElementTree as etree
 from datetime import date
 
-def getLocationId(city):
+def getLocation(city):
 
     api_key = "wV3l1uxVevrxnA6e"
 
@@ -16,15 +16,23 @@ def getLocationId(city):
     locationXML = urlfetch.fetch(url,deadline=60,method=urlfetch.GET)
 
     if locationXML.status_code == 200:
+        location = []
 
         tree = etree.fromstring(locationXML.content)
         locationId = tree.find('results/location/metroArea').attrib['id']
-        return locationId
+        locationLat = tree.find('results/location/metroArea').attrib['lat']
+        locationLong = tree.find('results/location/metroArea').attrib['lng']
+
+        location.insert(0, locationId)
+        location.insert(1, locationLat)
+        location.insert(2, locationLong)
+
+        return location
 
     else:
         # Need better error handling
         print "Location does not exist or something else went wrong with the connection to the Songkick server."
-
+       
 def getEvents(startDate, endDate, locId):
 
     api_key = "wV3l1uxVevrxnA6e"
