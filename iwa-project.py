@@ -1,5 +1,9 @@
-import cgi, datetime, wsgiref.handlers, os, random
+import cgi, datetime, wsgiref.handlers, os, random, urllib, urllib2, sys
 from datetime import date
+
+from operator import itemgetter
+
+from django.utils import simplejson as json
 
 from google.appengine.ext.webapp import template
 from google.appengine.ext import db
@@ -9,6 +13,12 @@ from google.appengine.ext.webapp.util import run_wsgi_app
 from google.appengine.api import urlfetch
 
 from xml.etree import ElementTree as etree
+
+from rdflib.graph import ConjunctiveGraph
+from rdflib.term import URIRef, Literal
+from rdflib.namespace import Namespace, RDF, RDFS, XSD
+
+rdfStoreUrl = 'http://ec2-46-51-144-109.eu-west-1.compute.amazonaws.com:8080/openrdf-sesame/repositories/iwaproj'
 
 class MainPage(webapp.RequestHandler):
     
@@ -27,9 +37,14 @@ class MainPage(webapp.RequestHandler):
         if date1 > date2:
             # Need better error handling
             print "Incorrect dates, make sure the end date lies after the start date."
+            sys.exit()
 
-        nrOfArtists = 500
+        nrOfArtists = 100
         artists = getLastfmArtists(username, nrOfArtists)
+
+        nrOfGenres = 5
+        topArtists = 3
+        genres = getGenres(artists, nrOfGenres, topArtists)
 
         location = getLocation(city)
 
@@ -37,25 +52,24 @@ class MainPage(webapp.RequestHandler):
 
         events = getEvents(date1, date2, location[0])
 
-        matchingEvents = matchEvents(artists, events)
+        graph = createRDF(username, city, artists, locationInformation, events, genres)
 
-        eventNames = []
-        index = 0
-        for concert in events:
-            eventNames.insert(index, concert[2])
-            index += 1
+        storeRDF(graph)
 
-        locationNames = []
-        index2 = 0
-        for location in locationInformation:
-            locationNames.insert(index2, location[0])
-            index2 += 1
+        matchingEventsAllDates = matchEvents(username, city)
+        recEventsAllDates = getRecommendations(username, city)
+
+        matchingEvents = filterDates(matchingEventsAllDates,date1,date2)
+        recEvents = filterDates(matchingEventsAllDates,date1,date2)
 
         template_values = {
+            'events': matchingEvents,
+            'recEvents': recEvents,
             'username': username,
-            'artists': artists,
-            'eventNames': eventNames,
-            'locations': locationNames,
+            'city': city,
+            'cityInfo': locationInformation[0:15],
+            'genres': genres,
+            'artists': artists[0:15]
         }
 
         path = os.path.join(os.path.dirname(__file__), "website.html")
@@ -72,6 +86,21 @@ def convertToDate(dateOld):
     dateArr = dateOld.split('/')
     dateNew = date(int(dateArr[2]),int(dateArr[0]),int(dateArr[1]))
     return dateNew
+
+def filterDates(events,start,end):
+
+    results = []
+    eventIndex = 0
+
+    for event in events:
+        dateArr = event[1].split('-')
+        dateEvent = date(int(dateArr[0]),int(dateArr[1]),int(dateArr[2]))
+
+        if dateEvent >= start and dateEvent <= end:
+            results.insert(eventIndex,event)
+            eventIndex += 1
+
+    return results
 
 def getLastfmArtists(username, nrOfArtists):
 
@@ -96,6 +125,7 @@ def getLastfmArtists(username, nrOfArtists):
     else:
         # Need better error handling
         print "Last FM User does not exist or something else went wrong with the connection to the Last FM server."
+        sys.exit()
 
     return artists
 
@@ -113,9 +143,11 @@ def getLocation(city):
         location = []
 
         tree = etree.fromstring(locationXML.content)
-        locationId = tree.find('results/location/metroArea').attrib['id']
-        locationLat = tree.find('results/location/metroArea').attrib['lat']
-        locationLong = tree.find('results/location/metroArea').attrib['lng']
+
+        location = tree.find('results/location/metroArea')
+        locationId = location.attrib['id']
+        locationLat = location.attrib['lat']
+        locationLong = location.attrib['lng']
 
         location.insert(0, locationId)
         location.insert(1, locationLat)
@@ -126,6 +158,7 @@ def getLocation(city):
     else:
         # Need better error handling
         print "Location does not exist or something else went wrong with the connection to the Songkick server."
+        sys.exit()
 
 def getLocInfo(lat,long):
 
@@ -143,25 +176,16 @@ def getLocInfo(lat,long):
         tree = etree.fromstring(poiXML.content)
 
         for poi in tree.findall('result'):
-            place = []
 
-            try:
-                poiName = poi.find('name').text
-                poiIcon = poi.find('icon').text
-
-                place.insert(0, poiName)
-                place.insert(1, poiIcon)
-
-                results.insert(index,place)
-                index += 1
-
-            except AttributeError:
-                print ""
+            poiName = poi.find('name').text
+            results.insert(index, poiName)
+            index += 1
 
         return results
 
     else:
         print "Something went wrong with the connection to the Google Places server"
+        sys.exit()
 
 def getEvents(startDate, endDate, locId):
 
@@ -218,19 +242,27 @@ def getEventsOnPage(startDate, endDate, url):
 
             if concertDate >= startDate and concertDate <= endDate:
 
-                concert = []
                 try:
-                    concert.insert(0, str(concertDate))
-                    concert.insert(1, event.attrib['displayName'])
-                    concert.insert(2, event.find('performance/artist').attrib['displayName'])
-                    concert.insert(3, event.find('venue').attrib['displayName'])
+                    genres = findEventGenres(event.find('performance/artist').attrib['displayName'])
+
+                    concert = []
+
+                    concert.insert(0, event.attrib['id'])
+                    concert.insert(1, concertDate)
+                    concert.insert(2, event.attrib['displayName'])
+                    concert.insert(3, event.find('performance/artist').attrib['displayName'])
+                    concert.insert(4, event.find('venue').attrib['displayName'])
+                    concert.insert(5, genres)
+
                 except AttributeError:
                     concert.insert(0, "")
                     concert.insert(1, "")
                     concert.insert(2, "")
                     concert.insert(3, "")
-                events.insert(eventIndex, concert)
+                    concert.insert(4, "")
+                    concert.insert(5, "")
 
+                events.insert(eventIndex, concert)
                 eventIndex += 1
 
         return events
@@ -239,17 +271,235 @@ def getEventsOnPage(startDate, endDate, url):
         # Need better error handling
         print "Event per page lookup failed or something else went wrong with the connection to the Songkick server."
 
-def matchEvents(artists,events):
+def matchEvents(username, city):
 
-    result = []
+    query = """
+PREFIX ns2:<http://iwa2012-18-project.appspot.com/>
+PREFIX ns1:<http://iwa2012-18-project.appspot.com/event/>
+PREFIX rdf:<http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT DISTINCT ?eventid ?event ?date
+WHERE {
+?eventid ns1:artist ?artistURI .
+<http://iwa2012-18-project.appspot.com/lastfm/%s> ns2:likesArtist ?artistURI .
+?eventid rdfs:label ?event .
+?eventid ns1:onDate ?date .
+?eventid ns1:city <http://dbpedia.org/resource/%s> .
+}
+""" % (username, city)
+
+    endPoint = rdfStoreUrl + "?"
+
+    response = queryRdfStore(endPoint, query)
+
+    res = []
+    resIndex = 0
+
+    for row in response:
+        event = []
+        eventIndex = 0
+        for key,value in row.iteritems():
+            event.insert(eventIndex,value)
+            eventIndex += 1
+        res.insert(resIndex, event)
+        resIndex += 1
+
+    return res
+
+def getRecommendations(username, city):
+    query = """
+PREFIX ns2:<http://iwa2012-18-project.appspot.com/>
+PREFIX ns1:<http://iwa2012-18-project.appspot.com/event/>
+PREFIX rdf:<http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT DISTINCT ?eventid ?event ?date
+WHERE {
+?eventid ns1:artist ?artistURI .
+?eventid ns1:genre ?genre .
+<http://iwa2012-18-project.appspot.com/lastfm/%s> ns2:likesGenre ?genre .
+?eventid rdfs:label ?event .
+?eventid ns1:onDate ?date .
+?eventid ns1:city <http://dbpedia.org/resource/%s> .
+}
+""" % (username, city)
+
+    endPoint = rdfStoreUrl + "?"
+
+    response = queryRdfStore(endPoint, query)
+
+    res = []
+    resIndex = 0
+
+    for row in response:
+        event = []
+        eventIndex = 0
+        for key,value in row.iteritems():
+            event.insert(eventIndex,value)
+            eventIndex += 1
+        res.insert(resIndex, event)
+        resIndex += 1
+
+    return res
+
+
+def getGenres(artists, nrOfGenres, topArtists):
+
+    if topArtists > len(artists):
+        topArtists = len(artists)
+
     index = 0
 
-    for concert in events:
-        if artists.count(concert[2]) > 0:
-            result.insert(index,concert)
-            index += 1
+    res = []
+    resindex = 0
 
-    return result
+    while(index < topArtists):
+        artist = artists[index].replace(" ","_")
+
+        query = """PREFIX dbpedia-owl: <http://dbpedia.org/property/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?genre
+WHERE {
+{ <http://dbpedia.org/resource/%s> dbpedia-owl:genre ?genreURI.
+?genreURI rdfs:label ?genre .
+FILTER (langMatches(lang(?genre), 'en')) }
+}
+""" % (artist)
+
+        endpoint = "http://dbpedia.org/sparql?"
+
+        response = queryRdfStore(endpoint,query)
+
+        index += 1
+
+        for row in response:
+    
+            for key,value in row.iteritems():
+                res.insert(resindex,value)
+                resindex += 1
+
+    resCounted = [(a, res.count(a)) for a in set(res)]
+    resSorted = sorted(resCounted, key=itemgetter(1), reverse=True)
+
+    genreIndex = 0
+    genres = []
+
+    for item in resSorted:
+        if genreIndex == nrOfGenres:
+            break
+        genres.insert(genreIndex, item[0])
+        genreIndex += 1
+
+    return genres
+
+def findEventGenres(artistName):
+
+    res = []
+
+    query = """
+PREFIX dbpedia-owl: <http://dbpedia.org/property/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?genre
+WHERE {
+{ <http://dbpedia.org/resource/%s> dbpedia-owl:genre ?genreURI.
+?genreURI rdfs:label ?genre .
+FILTER (langMatches(lang(?genre), 'en')) }
+}
+""" % (artistName.replace(" ","_"))
+
+    endpoint = "http://dbpedia.org/sparql?"
+
+    response = queryRdfStore(endpoint,query)
+
+    resindex = 0
+
+    for row in response:
+        for key,value in row.iteritems():
+            res.insert(resindex,value)
+            resindex += 1
+
+    return res
+
+def createRDF(username, city, artists, locationInformation, events, genres):
+
+    graph = ConjunctiveGraph()
+
+    rdfs = Namespace('http://www.w3.org/2000/01/rdf-schema#')
+    iwa = Namespace('http://iwa2012-18-project.appspot.com/')
+    lfm = Namespace('http://iwa2012-18-project.appspot.com/lastfm/')
+    ev = Namespace('http://iwa2012-18-project.appspot.com/event/')
+    dbp = Namespace('http://dbpedia.org/resource/') # DBPedia link to artists, genres and cities
+    
+    for artist in artists:
+
+        graph.add(( lfm[username], iwa['likesArtist'], dbp[artist.replace(" ","_")] ))
+        graph.add(( dbp[artist.replace(" ","_")], rdfs['label'], Literal(artist) ))
+
+    for location in locationInformation:
+
+        graph.add(( dbp[city.replace(" ","_")], iwa['poi'], Literal(location) ))
+
+    for event in events:
+
+        try:
+            graph.add(( ev[event[0]], ev['onDate'], Literal(str(event[1].year)+"-"+str(event[1].month)+"-"+str(event[1].day),datatype=XSD.date) ))
+            graph.add(( ev[event[0]], rdfs['label'], Literal(event[2]) ))
+            graph.add(( ev[event[0]], ev['artist'], dbp[event[3].replace(" ","_")] ))
+            graph.add(( ev[event[0]], ev['venue'], Literal(event[4]) ))
+            graph.add(( ev[event[0]], ev['city'], dbp[city.replace(" ","_")] ))
+
+            for eventGenre in event[5]:
+
+                graph.add(( ev[event[0]], ev['genre'], dbp[eventGenre.replace(" ","_")] ))
+
+        except AttributeError:
+            graph.add(( ev[event[0]], rdfs['label'], Literal("Event is missing information") ))
+
+    for genre in genres:
+
+        graph.add(( lfm[username], iwa['likesGenre'], dbp[genre.replace(" ","_")] ))
+        graph.add(( dbp[genre.replace(" ","_")], rdfs['label'], Literal(genre) ))
+
+    graph.add(( dbp[city.replace(" ","_")], rdfs['label'], Literal(city) ))
+
+    return graph
+
+def storeRDF(graph):
+
+    data=graph.serialize(format='xml')    
+    url = rdfStoreUrl + "/statements"
+
+    jsonresult = urlfetch.fetch(url,payload=data,deadline=30,method=urlfetch.POST, headers={ 'content-type': 'application/rdf+xml'})
+
+def queryRdfStore(endPoint, query):
+
+    try:
+        url = endPoint + urllib.urlencode({"query" : query})
+
+    except UnicodeEncodeError:
+        return ""
+
+    jsonresult = urlfetch.fetch(url,deadline=30,method=urlfetch.GET, headers={"accept" : "application/sparql-results+json"})
+
+    if(jsonresult.status_code == 200):
+        res = json.loads(jsonresult.content)
+        
+        res_var = res['head']['vars']
+        
+        response = []
+        for row in res['results']['bindings']:
+            dic = {}
+            for var in res_var:
+                dic[var] = row[var]['value']
+                
+            response.append(dic)
+                        
+        return response    
+    else:
+        return {"error" : jsonresult.content} 
 
 application = webapp.WSGIApplication([('/', MainPage)], debug=True)
 
