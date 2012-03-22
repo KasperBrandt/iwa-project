@@ -19,22 +19,12 @@ def getLocInfo(lat,long):
         tree = etree.fromstring(poiXML.content)
 
         for poi in tree.findall('result'):
-            place = []
-
-            try:
-                poiName = poi.find('name').text
-                poiIcon = poi.find('icon').text
-
-                place.insert(0, poiName)
-                place.insert(1, poiIcon)
-
-                results.insert(index,place)
-                index += 1
-
-            except AttributeError:
-                print ""
+            poiName = poi.find('name').text
+            results.insert(index,poiName)
+            index+=1
 
         return results
 
     else:
         print "Something went wrong with the connection to the Google Places server"
+        sys.exit()

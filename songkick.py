@@ -2,6 +2,7 @@
 # Songkick methods build specially for IWA (not a generic API).
 
 import urlfetch
+import sesame
 from xml.etree import ElementTree as etree
 from datetime import date
 
@@ -19,9 +20,10 @@ def getLocation(city):
         location = []
 
         tree = etree.fromstring(locationXML.content)
-        locationId = tree.find('results/location/metroArea').attrib['id']
-        locationLat = tree.find('results/location/metroArea').attrib['lat']
-        locationLong = tree.find('results/location/metroArea').attrib['lng']
+        location = tree.find('results/location/metroArea')
+        locationId = location.attrib['id']
+        locationLat = location.attrib['lat']
+        locationLong = location.attrib['lng']
 
         location.insert(0, locationId)
         location.insert(1, locationLat)
@@ -32,6 +34,7 @@ def getLocation(city):
     else:
         # Need better error handling
         print "Location does not exist or something else went wrong with the connection to the Songkick server."
+        sys.exit()
        
 def getEvents(startDate, endDate, locId):
 
@@ -88,19 +91,27 @@ def getEventsOnPage(startDate, endDate, url):
 
             if concertDate >= startDate and concertDate <= endDate:
 
-                concert = []
                 try:
-                    concert.insert(0, str(concertDate))
-                    concert.insert(1, event.attrib['displayName'])
-                    concert.insert(2, event.find('performance/artist').attrib['displayName'])
-                    concert.insert(3, event.find('venue').attrib['displayName'])
+                    genres = sesame.findEventGenres(event.find('performance/artist').attrib['displayName'])
+
+                    concert = []
+
+                    concert.insert(0, event.attrib['id'])
+                    concert.insert(1, concertDate)
+                    concert.insert(2, event.attrib['displayName'])
+                    concert.insert(3, event.find('performance/artist').attrib['displayName'])
+                    concert.insert(4, event.find('venue').attrib['displayName'])
+                    concert.insert(5, genres)
+
                 except AttributeError:
                     concert.insert(0, "")
                     concert.insert(1, "")
                     concert.insert(2, "")
                     concert.insert(3, "")
-                events.insert(eventIndex, concert)
+                    concert.insert(4, "")
+                    concert.insert(5, "")
 
+                events.insert(eventIndex, concert)
                 eventIndex += 1
 
         return events

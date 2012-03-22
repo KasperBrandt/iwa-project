@@ -5,10 +5,13 @@ from django.template import RequestContext
 from django.shortcuts import render_to_response
 from django import forms
 
+from datetime import date
+
 import songkick
 import util
 import places
 import lastfm_iwa as lastfm
+import sesame
 
 
 def index(request):
@@ -39,8 +42,12 @@ def main(request):
             # Need better error handling            
             print "Incorrect dates, make sure the end date lies after the start date."
 
-        nrOfArtists = 500
+        nrOfArtists = 100
         artists = lastfm.getUserArtists(username, nrOfArtists)
+
+        nrOfGenres = 5
+        topArtists = 3
+        genres = sesame.getGenres(artists, nrOfGenres, topArtists)
 
         location = songkick.getLocation(city)
 
@@ -48,27 +55,42 @@ def main(request):
 
         events = songkick.getEvents(date1, date2, location[0])
 
-        matchingEvents = util.matchEvents(artists, events)
+        graph = sesame.createRDF(username, city, artists, locationInformation, events, genres)
 
-        eventNames = []
-        index = 0
-        for concert in events:
-            eventNames.insert(index, concert[2])
-            index += 1
+        sesame.storeRDF(graph)
 
-        locationNames = []
-        index2 = 0
-        for location in locationInformation:
-            locationNames.insert(index2, location[0])
-            index2 += 1
+        matchingEventsAllDates = sesame.matchEvents(username, city)
+        recEventsAllDates = sesame.getRecommendations(username, city)
+
+        matchingEvents = filterDates(matchingEventsAllDates,date1,date2)
+        recEvents = filterDates(matchingEventsAllDates,date1,date2)                
 
         template_values = {
+            'events': matchingEvents,
+            'recEvents': recEvents,
             'username': username,
-            'artists': artists,
-            'eventNames': eventNames,
-            'locations': locationNames,
+            'city': city,
+            'cityInfo': locationInformation[0:15],
+            'genres': genres,
+            'artists': artists[0:15],
         }
         
         #path = os.path.join(os.path.dirname(__file__), "website.html")
         #self.response.out.write(template.render(path, template_values))
         return render_to_response("website.html", template_values)
+
+def filterDates(events,start,end):
+
+    results = []
+    eventIndex = 0
+    
+    for event in events:
+        dateArr = event[1].split('-')
+        dateEvent = date(int(dateArr[0]),int(dateArr[1]),int(dateArr[2]))
+        
+        if dateEvent >= start and dateEvent <= end:
+            results.insert(eventIndex,event)
+            eventIndex += 1
+            
+    return results
+

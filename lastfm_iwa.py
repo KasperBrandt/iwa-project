@@ -27,6 +27,7 @@ def getUserArtists(username, nrOfArtists):
     else:
         # Need better error handling
         print "Last FM User does not exist or something else went wrong with the connection to the Last FM server."
+        sys.exit()
 
     return artists
 
