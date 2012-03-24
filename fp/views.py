@@ -46,24 +46,25 @@ def main(request):
         artists = lastfm.getUserArtists(username, nrOfArtists)
 
         nrOfGenres = 5
-        topArtists = 3
-        genres = sesame.getGenres(artists, nrOfGenres, topArtists)
+        genres = sesame.getGenres(artists[0:5], nrOfGenres)
 
-        location = songkick.getLocation(city)
+        location = songkick.getLocation(city.replace(" ","_"))
 
         locationInformation = places.getLocInfo(location[1],location[2])
 
         events = songkick.getEvents(date1, date2, location[0])
 
-        graph = sesame.createRDF(username, city, artists, locationInformation, events, genres)
+        graph = sesame.createRDF(username, city.replace(" ","_"), artists, locationInformation, events, genres)
 
         sesame.storeRDF(graph)
 
-        matchingEventsAllDates = sesame.matchEvents(username, city)
-        recEventsAllDates = sesame.getRecommendations(username, city)
+        matchingEventsAllDates = sesame.matchEvents(username, city.replace(" ","_"))
+        recEventsAllDates = sesame.getRecommendations(username, city.replace(" ","_"))
 
         matchingEvents = filterDates(matchingEventsAllDates,date1,date2)
-        recEvents = filterDates(matchingEventsAllDates,date1,date2)                
+        recEventsDouble = filterDates(recEventsAllDates,date1,date2)
+
+        recEvents = noDoubles(matchingEvents, recEventsDouble)              
 
         template_values = {
             'events': matchingEvents,
@@ -93,4 +94,30 @@ def filterDates(events,start,end):
             eventIndex += 1
             
     return results
+
+def noDoubles(matchingEvents, recEvents):
+
+    recEventIds = []
+    eventIds = []
+    recEventI = 0
+    eventI = 0
+
+    for recEvent in recEvents:
+        recEventIds.insert(recEventI, recEvent[0].replace("http://",""))
+        recEventI += 1
+
+    for event in matchingEvents:
+        eventIds.insert(eventI, event[0].replace("http://",""))
+        eventI += 1
+
+    res = []
+    recIndex = 0
+
+    for recEventId in recEventIds:
+        if not recEventId in eventIds:
+            res.append(recEvents[recIndex])
+
+        recIndex += 1
+
+    return res
 

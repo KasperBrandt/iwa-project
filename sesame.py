@@ -84,55 +84,56 @@ def getRecommendations(username, city):
     return res
 
 
-def getGenres(artists, nrOfGenres, topArtists):
+def getGenres(artists, nrOfGenres):
 
-   if topArtists > len(artists):
-      topArtists = len(artists)
+    query = """PREFIX dbpedia-owl: <http://dbpedia.org/property/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?genre
+WHERE {
+"""
+
+    query +="""
+{ <http://dbpedia.org/resource/%s> dbpedia-owl:genre ?genreURI.
+?genreURI rdfs:label ?genre .
+FILTER (langMatches(lang(?genre), 'en')) }
+""" % (artists.pop(0).replace(" ","_"))
+
+    for artist in artists:
+        query +="""
+UNION { <http://dbpedia.org/resource/%s> dbpedia-owl:genre ?genreURI.
+?genreURI rdfs:label ?genre .
+FILTER (langMatches(lang(?genre), 'en')) }
+""" % (artist.replace(" ","_"))
+
+    query +="}"
+
+    endpoint = "http://dbpedia.org/sparql?"
+
+    response = queryRdfStore(endpoint,query)
+
+    res = []
+    resindex = 0
+
+    for row in response:
  
-   index = 0
-      
-   res = []
-   resindex = 0
-
-   while(index < topArtists):
-      artist = artists[index].replace(" ","_")
-      
-      query = """PREFIX dbpedia-owl: <http://dbpedia.org/property/>
-      PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-
-      SELECT ?genre
-      WHERE {
-      { <http://dbpedia.org/resource/%s> dbpedia-owl:genre ?genreURI.
-      ?genreURI rdfs:label ?genre .
-      FILTER (langMatches(lang(?genre), 'en')) }
-      }
-      """ % (artist)
-
-      endpoint = "http://dbpedia.org/sparql?"
-
-      response = queryRdfStore(endpoint,query)
-
-      index += 1
-
-      for row in response:
-    
-         for key,value in row.iteritems():
+        for key,value in row.iteritems():
             res.insert(resindex,value)
             resindex += 1
 
-   resCounted = [(a, res.count(a)) for a in set(res)]
-   resSorted = sorted(resCounted, key=itemgetter(1), reverse=True)
+    resCounted = [(a, res.count(a)) for a in set(res)]
+    resSorted = sorted(resCounted, key=itemgetter(1), reverse=True)
 
-   genreIndex = 0
-   genres = []
+    genreIndex = 0
+    genres = []
 
-   for item in resSorted:
-      if genreIndex == nrOfGenres:
-         break
-      genres.insert(genreIndex, item[0])
-      genreIndex += 1
+    for item in resSorted:
+        if genreIndex == nrOfGenres:
+            break
+        genres.insert(genreIndex, item[0])
+        genreIndex += 1
 
-   return genres
+    return genres
 
 def findEventGenres(artistName):
 
