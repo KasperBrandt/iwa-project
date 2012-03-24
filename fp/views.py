@@ -62,7 +62,9 @@ def main(request):
         recEventsAllDates = sesame.getRecommendations(username, city)
 
         matchingEvents = filterDates(matchingEventsAllDates,date1,date2)
-        recEvents = filterDates(matchingEventsAllDates,date1,date2)                
+        recEventsDouble = filterDates(recEventsAllDates,date1,date2)
+
+        recEvents = noDoubles(matchingEvents, recEventsDouble)              
 
         template_values = {
             'events': matchingEvents,
@@ -93,3 +95,28 @@ def filterDates(events,start,end):
             
     return results
 
+def noDoubles(matchingEvents, recEvents):
+
+    recEventIds = []
+    eventIds = []
+    recEventI = 0
+    eventI = 0
+
+    for recEvent in recEvents:
+        recEventIds.insert(recEventI, recEvent[0].replace("http://",""))
+        recEventI += 1
+
+    for event in matchingEvents:
+        eventIds.insert(eventI, event[0].replace("http://",""))
+        eventI += 1
+
+    res = []
+    recIndex = 0
+
+    for recEventId in recEventIds:
+        if not recEventId in eventIds:
+            res.append(recEvents[recIndex])
+
+        recIndex += 1
+
+    return res
