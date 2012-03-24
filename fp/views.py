@@ -48,18 +48,18 @@ def main(request):
         nrOfGenres = 5
         genres = sesame.getGenres(artists[0:5], nrOfGenres)
 
-        location = songkick.getLocation(city)
+        location = songkick.getLocation(city.replace(" ","_"))
 
         locationInformation = places.getLocInfo(location[1],location[2])
 
         events = songkick.getEvents(date1, date2, location[0])
 
-        graph = sesame.createRDF(username, city, artists, locationInformation, events, genres)
+        graph = sesame.createRDF(username, city.replace(" ","_"), artists, locationInformation, events, genres)
 
         sesame.storeRDF(graph)
 
-        matchingEventsAllDates = sesame.matchEvents(username, city)
-        recEventsAllDates = sesame.getRecommendations(username, city)
+        matchingEventsAllDates = sesame.matchEvents(username, city.replace(" ","_"))
+        recEventsAllDates = sesame.getRecommendations(username, city.replace(" ","_"))
 
         matchingEvents = filterDates(matchingEventsAllDates,date1,date2)
         recEventsDouble = filterDates(recEventsAllDates,date1,date2)
