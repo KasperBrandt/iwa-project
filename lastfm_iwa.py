@@ -56,7 +56,7 @@ def getAlbumInfo(mb_id):
 
         name =  album.find('name').text
         reldate = album.find('releasedate').text.strip()
-        image = album.find("image[@size='large']").text
+        image = album.find("image").text
         
         return {'name': name, 'reldate' : reldate, 'image': image}
         
