@@ -80,7 +80,7 @@ def getArtistImage(mb_id):
         tree = etree.fromstring(XML.content)        
 
         name = tree.find("images").attrib['artist']
-        image = tree.find("images").find("image").find('sizes').find("size[@name='original']").text
+        image = tree.find("images").find("image").find('sizes').find("size").text
         return {'name': name, 'image': image}
         
         
