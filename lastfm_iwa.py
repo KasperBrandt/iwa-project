@@ -39,14 +39,14 @@ def getUserArtists(username, nrOfArtists):
 def getAlbumInfo(mb_id):
 
     url = "http://ws.audioscrobbler.com/2.0/?method=album.getinfo&api_key="+api_key+"&mbid="+mb_id
-    logger.info("getAlbum "+mb_id+" "+url)
+    #logger.info("getAlbum "+mb_id+" "+url)
 
     error = False
     try: 
         albumXML = urlfetch.fetch(url,deadline=60,method=urlfetch.GET)        
     except urllib2.HTTPError:
         error = True
-        logger.info("album not found.: "+mb_id)
+        #logger.info("album not found.: "+mb_id)
             
     if not error and albumXML.status_code == 200:
         
@@ -64,7 +64,7 @@ def getArtistImage(mb_id):
 
     url = "http://ws.audioscrobbler.com/2.0/?method=artist.getimages&mbid="+mb_id+"&api_key="+api_key+"&limit=1"
 
-    logger.info("getAlbum "+mb_id+" "+url)
+    #logger.info("getAlbum "+mb_id+" "+url)
 
     error = False
     
@@ -72,7 +72,7 @@ def getArtistImage(mb_id):
         XML = urlfetch.fetch(url,deadline=60,method=urlfetch.GET)        
     except urllib2.HTTPError:
         error = True
-        logger.info("album not found.: "+mb_id)
+        #logger.info("album not found.: "+mb_id)
 
     
     if not error and XML.status_code == 200:
