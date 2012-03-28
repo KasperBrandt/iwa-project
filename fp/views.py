@@ -1,3 +1,4 @@
+
 # Create your views here.
 from django.http import HttpResponse
 from django.core.context_processors import csrf
@@ -12,7 +13,6 @@ import util
 import places
 import lastfm_iwa as lastfm
 import sesame
-
 
 def index(request):
     return HttpResponse(lastfm.__file__)
@@ -103,7 +103,7 @@ def noDoubles(matchingEvents, recEvents):
     eventI = 0
 
     for recEvent in recEvents:
-        recEventIds.insert(recEventI, recEvent[0].replace("http://",""))
+        recEventIds.insert(recEventI, recEvent[0].replace("http://",""))        
         recEventI += 1
 
     for event in matchingEvents:
@@ -121,3 +121,31 @@ def noDoubles(matchingEvents, recEvents):
 
     return res
 
+def artist(request):
+    
+    mb_id = None
+
+    if "mb_id" in request.GET:
+        mb_id = request.GET["mb_id"]
+        
+
+    if(not mb_id):
+        mb_id = "309c62ba-7a22-4277-9f67-4a162526d18a"
+    res = sesame.getArtistCard(mb_id)
+    img_info = lastfm.getArtistImage(mb_id)
+
+    for entry in res:
+        album = lastfm.getAlbumInfo(util.getMBId(entry['album_mbid']))
+        album = None
+        if album: 
+            entry['cover'] = album['image']
+            entry['reldate'] = album['reldate']
+            entry['album']  = album['name']
+        else:
+            entry['cover'] = "http://cdn.last.fm/flatness/catalogue/noimage/2/default_album_large.png"
+            entry['reldate'] = "01/01/1970"
+            entry['album'] = 'No title found'
+
+    template_values = {'name': img_info['name'],'artist_card': res, 'image': img_info['image']}
+
+    return render_to_response("artist.html", template_values)

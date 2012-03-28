@@ -18,7 +18,7 @@
                                <h3>{{ username }} information</h3>
                                <h5>Top artists:</h5>
                                {% for artist in artists %}
-                                       - {{ artist }}<br>
+                                       - <a href="/artist/?mb_id={{artist.mbid}}">{{ artist.name }}</a><br>
                                {% endfor %}
                                <h5>Top genres:</h5>
                                {% for genre in genres %}

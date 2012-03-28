@@ -10,6 +10,25 @@ from rdflib.term import URIRef, Literal
 from rdflib.namespace import Namespace, RDF, RDFS, XSD
 
 rdfStoreUrl = 'http://ec2-46-51-144-109.eu-west-1.compute.amazonaws.com:8080/openrdf-sesame/repositories/iwaproj'
+#rdfStoreUrl = 'http://localhost:8081/openrdf-sesame/repositories/iwaproj'
+
+#Obtains the dbPedia entry corresponding to the mb_id (Music Brain ID)
+def getDbPediaEntry(mb_id): 
+
+   endPoint = rdfStoreUrl + "?"
+   
+   query = """PREFIX dbpedia-owl:<http://www.w3.org/2002/07/owl#>
+
+   SELECT DISTINCT ?db_entry
+   WHERE {
+   ?db_entry dbpedia-owl:sameAs %s
+   }""" % ('<http://zitgist.com/music/artist/'+mb_id+'>')
+   
+   res = queryRdfStore(endPoint, query)
+   if len(res) > 0:
+      return res[0]['db_entry']
+   else:
+      return None
 
 def matchEvents(username,city):
 
@@ -83,57 +102,68 @@ def getRecommendations(username, city):
 
     return res
 
-
+def appendArtistToFilter(dbEntryUrl, last=False):
+   if(last):
+      return " ?artist = <"+dbEntryUrl + "> "
+   else:
+      return " ?artist = <"+dbEntryUrl + "> || "
+  
 def getGenres(artists, nrOfGenres):
 
-    query = """PREFIX dbpedia-owl: <http://dbpedia.org/property/>
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+   artist_filter = ''
+   
+   for rank,artist in enumerate(artists):
 
-SELECT ?genre
-WHERE {
-"""
+      entry = None
+      
+      if(artist['mbid']):
+         entry = getDbPediaEntry(artist['mbid'])
+         
+      if(not entry):
+         #print "NOT Entry : "+artist['name']
+         entry = "http://dbpedia.org/resource/"+artist['name'].replace(" ","_")
+         
+      artist_filter += appendArtistToFilter(entry, (rank==(len(artists)-1)))
+      
+   query = """PREFIX dbpedia-owl: <http://dbpedia.org/property/>
+   PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
-    query +="""
-{ <http://dbpedia.org/resource/%s> dbpedia-owl:genre ?genreURI.
-?genreURI rdfs:label ?genre .
-FILTER (langMatches(lang(?genre), 'en')) }
-""" % (artists.pop(0).replace(" ","_"))
+   SELECT ?genre
+   WHERE {
+   { ?artist dbpedia-owl:genre ?genreURI.
+   ?genreURI rdfs:label ?genre .
+   FILTER (langMatches(lang(?genre), 'en')) }
+   FILTER (%s)
+   
+   }
+   """ % (artist_filter)
+       
+   endpoint = "http://dbpedia.org/sparql?"
 
-    for artist in artists:
-        query +="""
-UNION { <http://dbpedia.org/resource/%s> dbpedia-owl:genre ?genreURI.
-?genreURI rdfs:label ?genre .
-FILTER (langMatches(lang(?genre), 'en')) }
-""" % (artist.replace(" ","_"))
-
-    query +="}"
-
-    endpoint = "http://dbpedia.org/sparql?"
-
-    response = queryRdfStore(endpoint,query)
-
-    res = []
-    resindex = 0
-
-    for row in response:
+   response = queryRdfStore(endpoint,query)
+    
+   res = []
+   resindex = 0
+   
+   for row in response:
  
-        for key,value in row.iteritems():
-            res.insert(resindex,value)
-            resindex += 1
+      for key,value in row.iteritems():
+           res.insert(resindex,value)
+           resindex += 1
 
-    resCounted = [(a, res.count(a)) for a in set(res)]
-    resSorted = sorted(resCounted, key=itemgetter(1), reverse=True)
+   resCounted = [(a, res.count(a)) for a in set(res)]
+   resSorted = sorted(resCounted, key=itemgetter(1), reverse=True)
 
-    genreIndex = 0
-    genres = []
+   genreIndex = 0
+   genres = []
 
-    for item in resSorted:
-        if genreIndex == nrOfGenres:
-            break
-        genres.insert(genreIndex, item[0])
-        genreIndex += 1
-
-    return genres
+   for item in resSorted:
+      if genreIndex == nrOfGenres:
+         break
+      genres.insert(genreIndex, item[0])
+      genreIndex += 1
+      
+   return genres
 
 def findEventGenres(artistName):
 
@@ -164,6 +194,35 @@ def findEventGenres(artistName):
 
     return res
 
+def getArtistCard(mb_id):
+
+   #http://www.bbc.co.uk/music/artists/309c62ba-7a22-4277-9f67-4a162526d18a#artist
+   endpoint = "http://api.talis.com/stores/bbc-backstage/services/sparql?"
+   query = """PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+   PREFIX dc: <http://purl.org/dc/elements/1.1/>
+   PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+   PREFIX mo: <http://purl.org/ontology/mo/>
+   PREFIX rel: <http://purl.org/vocab/relationship/>
+   PREFIX rev: <http://purl.org/stuff/rev#>
+   SELECT ?rev ?title ?author ?album_mbid ?text WHERE {
+    
+   ?rev a rev:Review;
+   rev:reviewer ?person;
+   foaf:primaryTopic ?record. 
+   
+   ?person foaf:name ?author.
+   ?rev rev:title ?title. 
+    
+   ?record mo:musicbrainz ?album_mbid; 
+   foaf:maker <http://www.bbc.co.uk/music/artists/%s#artist>.
+   
+   ?rev rev:text ?text.
+   }""" % (mb_id)
+   #print endpoint
+   #print query
+   response = queryRdfStore(endpoint, query)
+   return response
+
 def createRDF(username, city, artists, locationInformation, events, genres):
 
     graph = ConjunctiveGraph()
@@ -176,8 +235,8 @@ def createRDF(username, city, artists, locationInformation, events, genres):
     
     for artist in artists:
 
-        graph.add(( lfm[username], iwa['likesArtist'], dbp[artist.replace(" ","_")] ))
-        graph.add(( dbp[artist.replace(" ","_")], rdfs['label'], Literal(artist) ))
+        graph.add(( lfm[username], iwa['likesArtist'], dbp[artist['name'].replace(" ","_")] ))
+        graph.add(( dbp[artist['name'].replace(" ","_")], rdfs['label'], Literal(artist['name']) ))
 
     for location in locationInformation:
 
@@ -223,21 +282,23 @@ def queryRdfStore(endPoint, query):
     except UnicodeEncodeError:
         return ""
 
+    #print url
     jsonresult = urlfetch.fetch(url,deadline=30,method=urlfetch.GET, headers={"accept" : "application/sparql-results+json"})
 
     if(jsonresult.status_code == 200):
-        res = json.loads(jsonresult.content)
+       res = json.loads(jsonresult.content)
+       
+       res_var = res['head']['vars']
         
-        res_var = res['head']['vars']
-        
-        response = []
-        for row in res['results']['bindings']:
-            dic = {}
-            for var in res_var:
-                dic[var] = row[var]['value']
-                
-            response.append(dic)
+       response = []
+       for row in res['results']['bindings']:
+          dic = {}
+          
+          for var in res_var:
+             dic[var] = row[var]['value']
+
+          response.append(dic)
                         
-        return response    
+       return response    
     else:
-        return {"error" : jsonresult.content} 
+       return {"error" : jsonresult.content} 
