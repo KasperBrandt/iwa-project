@@ -1,0 +1,36 @@
+<html>
+{% load static %}
+  <head>
+
+<!--    <link type="text/css" rel="stylesheet" href="{% get_static_prefix %}stylesheets/main.css" />   -->
+    <script src="{% get_static_prefix %}js/jquery-1.7.1.min.js" type="text/javascript"></script>
+    <script src="{% get_static_prefix %}js/date.js" type="text/javascript"></script>
+    <script src="{% get_static_prefix %}js/jquery.ui.datepicker.js" type="text/javascript"></script>
+    <script src="{% get_static_prefix %}js/jquery.ui.core.js" type="text/javascript"></script>
+    <script language="javascript"> 
+      $('#book').click(function() {
+      alert('ha hecho click'); 
+      });
+    </script>
+ 
+<!-- <a id="displayText" href="javascript:toggle();">show</a> <== click Here -->
+<!-- <div id="toggleText" style="display: none"><h1>peek-a-boo</h1></div> -->
+  </head>
+  <body>
+
+    <img id="book" src="{{image}}"/>
+
+    <h1>{{name}}</h1>
+    <table>
+    {% for entry in artist_card %}
+
+    <tr><td>Author: {{  entry.author }}  </td></tr>
+    <tr><td>Album: <a href="{{  entry.album_mbid }}"> {{entry.title}}</a></td></tr>   
+    <tr><td colspan='2'>{{  entry.text }}  </td><td><img src="{{ entry.cover }}" /></td></tr> 
+    <tr><td><a href="{{  entry.rev }}" target='_blank'>View Original Review</a></td></tr>
+    <tr><td>--------------------------</td></tr>
+   
+    {% endfor %}
+    </table>
+  </body>
+</html>
